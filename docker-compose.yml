@@ -4,7 +4,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile-multistage
+      dockerfile: Dockerfile
       target: development
     container_name: myapp_dev
     ports:
@@ -21,7 +21,7 @@ services:
       # Assuming a config directory could be placed in ./config
       - ./config:/app/config:ro
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\" || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
