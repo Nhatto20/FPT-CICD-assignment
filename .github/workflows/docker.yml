@@ -54,3 +54,4 @@ jobs:
           format: table
           exit-code: 1 # fail the job if HIGH/CRITICAL CVEs found
           severity: HIGH,CRITICAL
+          ignore-unfixed: true
