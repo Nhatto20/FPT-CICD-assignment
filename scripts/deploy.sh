@@ -22,7 +22,7 @@ echo "▶ Pulling image: $IMAGE"
 docker pull "$IMAGE"
 
 # ── Stop and replace running container ───────────────────────────────────────
-echo "▶ Stopping existing container ..."
+echo "▶ Stopping existing container (if any)..."
 docker stop "$CONTAINER_NAME" 2>/dev/null || true
 docker rm   "$CONTAINER_NAME" 2>/dev/null || true
 
