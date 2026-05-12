@@ -18,7 +18,7 @@ if [[ -z "$IMAGE" ]]; then
 fi
 
 # ── Pull new image ────────────────────────────────────────────────────────────
-echo "▶ Main: Pulling image: $IMAGE"
+echo "▶ Pulling image: $IMAGE"
 docker pull "$IMAGE"
 
 # ── Stop and replace running container ───────────────────────────────────────
