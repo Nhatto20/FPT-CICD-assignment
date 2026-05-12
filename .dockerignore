@@ -1,0 +1,22 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+.venv
+venv/
+env/
+
+# Tests & Documentation
+tests/
+test/
+docs/
+README.md
+
+# Environment files
+.env

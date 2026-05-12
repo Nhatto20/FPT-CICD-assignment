@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "myapp"
+version = "0.1.0"
+description = "Simple FastAPI app"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi==0.115.12",
+    "uvicorn==0.34.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "httpx",       # required by FastAPI TestClient
+    "ruff",
+    "black",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["test_*.py"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]

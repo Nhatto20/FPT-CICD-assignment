@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile-multistage
+      target: development
+    container_name: myapp_dev
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=development
+      - PORT=8000
+    volumes:
+      # Volume mount for hot-reload
+      - ./:/app
+      # Persistent data storage (named volume)
+      - app_data:/app/data
+      # Configuration files (read-only)
+      # Assuming a config directory could be placed in ./config
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  app_data:
