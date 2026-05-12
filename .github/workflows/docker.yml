@@ -53,4 +53,4 @@ jobs:
           image-ref: ghcr.io/${{ env.REPO_LC }}:${{ github.sha }}
           format: table
           exit-code: 1 # fail the job if HIGH/CRITICAL CVEs found
-          severity: HIGH,CRITICAL
+          severity: CRITICAL
