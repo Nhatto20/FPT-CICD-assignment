@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 1. Add step to convert repository name to lowercase
       - name: Set lowercase repository name
@@ -62,7 +62,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 1. Add step to convert repository name to lowercase
       - name: Set lowercase repository name
@@ -116,7 +116,7 @@ jobs:
 
 #     steps:
 #       - name: Checkout code
-#         uses: actions/checkout@v4
+#         uses: actions/checkout@v5
 
 #       - name: Copy deploy script to server
 #         uses: appleboy/scp-action@v0.1.7
@@ -156,7 +156,7 @@ jobs:
 
 #     steps:
 #       - name: Checkout code
-#         uses: actions/checkout@v4
+#         uses: actions/checkout@v5
 
 #       - name: Copy deploy script to server
 #         uses: appleboy/scp-action@v0.1.7
