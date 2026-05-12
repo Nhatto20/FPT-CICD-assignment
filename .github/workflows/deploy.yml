@@ -19,6 +19,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 1. Add step to convert repository name to lowercase
+      - name: Set lowercase repository name
+        run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - name: Copy deploy script to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -35,8 +39,9 @@ jobs:
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           script: |
-            chmod +x /app/deploy.sh
-            /app/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
+            chmod +x /app/scripts/deploy.sh
+            # 2. Use the new env.REPO_LC variable here
+            /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.sha }}
 
       - name: Notify staging deployment status
         if: always()
@@ -59,13 +64,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 1. Add step to convert repository name to lowercase
+      - name: Set lowercase repository name
+        run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
       - name: Copy deploy script to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          source: "deploy.sh"
+          # Fixed path to match staging job
+          source: "scripts/deploy.sh"
           target: "/app"
 
       - name: Run deploy script
@@ -75,8 +85,9 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
-            chmod +x /app/deploy.sh
-            /app/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
+            chmod +x /app/scripts/deploy.sh
+            # 2. Use the new env.REPO_LC variable here
+            /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.sha }}
 
       - name: Notify production deployment status
         if: always()
@@ -85,3 +96,91 @@ jobs:
           echo "Production deployment $STATUS for commit ${{ github.sha }}"
           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
           #   -d "{\"text\": \"Production deploy $STATUS: ${{ github.sha }}\"}"
+
+# name: Deploy
+
+# on:
+#   push:
+#     branches:
+#       - develop # auto-deploy to staging
+#       - main # deploy to production (requires manual approval)
+
+# jobs:
+#   deploy-staging:
+#     if: github.ref == 'refs/heads/develop'
+#     name: Deploy to Staging
+#     runs-on: ubuntu-latest
+#     environment:
+#       name: staging
+#       url: http://staging.myapp.com # shown in GitHub deployment UI
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Copy deploy script to server
+#         uses: appleboy/scp-action@v0.1.7
+#         with:
+#           host: ${{ secrets.STAGING_HOST }}
+#           username: ${{ secrets.STAGING_USER }}
+#           key: ${{ secrets.STAGING_SSH_KEY }}
+#           source: "scripts/deploy.sh"
+#           target: "/app"
+
+#       - name: Run deploy script
+#         uses: appleboy/ssh-action@v1
+#         with:
+#           host: ${{ secrets.STAGING_HOST }}
+#           username: ${{ secrets.STAGING_USER }}
+#           key: ${{ secrets.STAGING_SSH_KEY }}
+#           script: |
+#             chmod +x /app/deploy.sh
+#             /app/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+#       - name: Notify staging deployment status
+#         if: always()
+#         run: |
+#           STATUS=${{ job.status }}
+#           echo "Staging deployment $STATUS for commit ${{ github.sha }}"
+#           # Swap in your real notification (Slack, email, etc.)
+#           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+#           #   -d "{\"text\": \"Staging deploy $STATUS: ${{ github.sha }}\"}"
+
+#   deploy-production:
+#     if: github.ref == 'refs/heads/main'
+#     name: Deploy to Production
+#     runs-on: ubuntu-latest
+#     environment:
+#       name: production # GitHub will pause here for manual approval
+#       url: http://myapp.com
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Copy deploy script to server
+#         uses: appleboy/scp-action@v0.1.7
+#         with:
+#           host: ${{ secrets.PROD_HOST }}
+#           username: ${{ secrets.PROD_USER }}
+#           key: ${{ secrets.PROD_SSH_KEY }}
+#           source: "deploy.sh"
+#           target: "/app"
+
+#       - name: Run deploy script
+#         uses: appleboy/ssh-action@v1
+#         with:
+#           host: ${{ secrets.PROD_HOST }}
+#           username: ${{ secrets.PROD_USER }}
+#           key: ${{ secrets.PROD_SSH_KEY }}
+#           script: |
+#             chmod +x /app/deploy.sh
+#             /app/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+#       - name: Notify production deployment status
+#         if: always()
+#         run: |
+#           STATUS=${{ job.status }}
+#           echo "Production deployment $STATUS for commit ${{ github.sha }}"
+#           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+#           #   -d "{\"text\": \"Production deploy $STATUS: ${{ github.sha }}\"}"
