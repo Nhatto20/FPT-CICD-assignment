@@ -6,98 +6,157 @@ on:
     types:
       - completed
     branches:
-      - develop # auto-deploy to staging
-      - main # deploy to production (requires manual approval)
+      - develop
+      - main
 
 jobs:
-  deploy-staging:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop'
-    name: Deploy to Staging
-    runs-on: self-hosted
-    environment:
-      name: staging
-      url: http://staging.myapp.com # shown in GitHub deployment UI
+  deploy-local:
+    # Chỉ chạy khi build thành công
+    if: github.event.workflow_run.conclusion == 'success'
+    name: Deploy to Local Machine
+    runs-on: self-hosted # Chạy trực tiếp qua Runner trên máy bạn
+
+    # Cấp quyền cho GITHUB_TOKEN để nó có thể tải Docker Image từ GHCR
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set lowercase repository name
         run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
-      - name: Copy deploy script to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.STAGING_HOST }}
-          username: ${{ secrets.STAGING_USER }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          source: "scripts/deploy.sh"
-          target: "/app"
+      - name: Login to GitHub Container Registry (GHCR)
+        # Sử dụng GITHUB_TOKEN mặc định của GitHub Action, không cần tạo Secret
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Run deploy script
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.STAGING_HOST }}
-          username: ${{ secrets.STAGING_USER }}
-          key: ${{ secrets.STAGING_SSH_KEY }}
-          script: |
-            chmod +x /app/scripts/deploy.sh
-            # Use the new env.REPO_LC variable and workflow_run.head_sha here
-            /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}
-
-      - name: Notify staging deployment status
-        if: always()
+      - name: Deploy Docker Container Local
         run: |
-          STATUS=${{ job.status }}
-          echo "Staging deployment $STATUS for commit ${{ github.event.workflow_run.head_sha }}"
-          # Swap in your real notification (Slack, email, etc.)
-          # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
-          #   -d "{\"text\": \"Staging deploy $STATUS: ${{ github.event.workflow_run.head_sha }}\"}"
+          # 1. Định nghĩa tên image
+          IMAGE_TAG="ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}"
 
-  deploy-production:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
-    name: Deploy to Production
-    runs-on: self-hosted
-    environment:
-      name: production # GitHub will pause here for manual approval
-      url: http://myapp.com
+          echo ">>> Bắt đầu tải image mới về máy tính: $IMAGE_TAG"
+          docker pull $IMAGE_TAG
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          echo ">>> Dừng và xóa container cũ (nếu có)"
+          # Lưu ý: 'my-app-container' là tên định danh trên máy bạn, bạn có thể đổi tên khác
+          docker stop my-app-container || true
+          docker rm my-app-container || true
 
-      - name: Set lowercase repository name
-        run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+          echo ">>> Khởi chạy container mới"
+          # LƯU Ý: Thay đổi cổng 8000:8000 cho khớp với ứng dụng của bạn
+          docker run -d \
+            --name my-app-container \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            $IMAGE_TAG
+            
+          echo ">>> Cập nhật thành công!"
 
-      - name: Copy deploy script to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          # Fixed path to match staging job
-          source: "scripts/deploy.sh"
-          target: "/app"
+# name: Deploy
 
-      - name: Run deploy script
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.PROD_HOST }}
-          username: ${{ secrets.PROD_USER }}
-          key: ${{ secrets.PROD_SSH_KEY }}
-          script: |
-            chmod +x /app/scripts/deploy.sh
-            # Use the new env.REPO_LC variable and workflow_run.head_sha here
-            /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}
+# on:
+#   workflow_run:
+#     workflows: ["Docker Build & Scan"] # Đợi Docker build xong
+#     types:
+#       - completed
+#     branches:
+#       - develop # auto-deploy to staging
+#       - main # deploy to production (requires manual approval)
 
-      - name: Notify production deployment status
-        if: always()
-        run: |
-          STATUS=${{ job.status }}
-          echo "Production deployment $STATUS for commit ${{ github.event.workflow_run.head_sha }}"
-          # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
-          #   -d "{\"text\": \"Production deploy $STATUS: ${{ github.event.workflow_run.head_sha }}\"}"
+# jobs:
+#   deploy-staging:
+#     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop'
+#     name: Deploy to Staging
+#     runs-on: self-hosted
+#     environment:
+#       name: staging
+#       url: http://staging.myapp.com # shown in GitHub deployment UI
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v5
+#         with:
+#           ref: ${{ github.event.workflow_run.head_sha }}
+
+#       - name: Set lowercase repository name
+#         run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+#       - name: Copy deploy script to server
+#         uses: appleboy/scp-action@v0.1.7
+#         with:
+#           host: ${{ secrets.STAGING_HOST }}
+#           username: ${{ secrets.STAGING_USER }}
+#           key: ${{ secrets.STAGING_SSH_KEY }}
+#           source: "scripts/deploy.sh"
+#           target: "/app"
+
+#       - name: Run deploy script
+#         uses: appleboy/ssh-action@v1
+#         with:
+#           host: ${{ secrets.STAGING_HOST }}
+#           username: ${{ secrets.STAGING_USER }}
+#           key: ${{ secrets.STAGING_SSH_KEY }}
+#           script: |
+#             chmod +x /app/scripts/deploy.sh
+#             # Use the new env.REPO_LC variable and workflow_run.head_sha here
+#             /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}
+
+#       - name: Notify staging deployment status
+#         if: always()
+#         run: |
+#           STATUS=${{ job.status }}
+#           echo "Staging deployment $STATUS for commit ${{ github.event.workflow_run.head_sha }}"
+#           # Swap in your real notification (Slack, email, etc.)
+#           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+#           #   -d "{\"text\": \"Staging deploy $STATUS: ${{ github.event.workflow_run.head_sha }}\"}"
+
+#   deploy-production:
+#     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+#     name: Deploy to Production
+#     runs-on: self-hosted
+#     environment:
+#       name: production # GitHub will pause here for manual approval
+#       url: http://myapp.com
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v5
+#         with:
+#           ref: ${{ github.event.workflow_run.head_sha }}
+
+#       - name: Set lowercase repository name
+#         run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+
+#       - name: Copy deploy script to server
+#         uses: appleboy/scp-action@v0.1.7
+#         with:
+#           host: ${{ secrets.PROD_HOST }}
+#           username: ${{ secrets.PROD_USER }}
+#           key: ${{ secrets.PROD_SSH_KEY }}
+#           # Fixed path to match staging job
+#           source: "scripts/deploy.sh"
+#           target: "/app"
+
+#       - name: Run deploy script
+#         uses: appleboy/ssh-action@v1
+#         with:
+#           host: ${{ secrets.PROD_HOST }}
+#           username: ${{ secrets.PROD_USER }}
+#           key: ${{ secrets.PROD_SSH_KEY }}
+#           script: |
+#             chmod +x /app/scripts/deploy.sh
+#             # Use the new env.REPO_LC variable and workflow_run.head_sha here
+#             /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}
+
+#       - name: Notify production deployment status
+#         if: always()
+#         run: |
+#           STATUS=${{ job.status }}
+#           echo "Production deployment $STATUS for commit ${{ github.event.workflow_run.head_sha }}"
+#           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+#           #   -d "{\"text\": \"Production deploy $STATUS: ${{ github.event.workflow_run.head_sha }}\"}"
