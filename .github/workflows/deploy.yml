@@ -1,23 +1,31 @@
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Docker Build & Scan"] # Đợi Docker build xong
+    types:
+      - completed
     branches:
       - develop # auto-deploy to staging
       - main # deploy to production (requires manual approval)
 
 jobs:
   deploy-staging:
-    if: github.ref == 'refs/heads/develop'
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop'
     name: Deploy to Staging
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment:
       name: staging
       url: http://staging.myapp.com # shown in GitHub deployment UI
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set lowercase repository name
+        run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Copy deploy script to server
         uses: appleboy/scp-action@v0.1.7
@@ -35,29 +43,35 @@ jobs:
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           script: |
-            chmod +x /app/deploy.sh
-            /app/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
+            chmod +x /app/scripts/deploy.sh
+            # Use the new env.REPO_LC variable and workflow_run.head_sha here
+            /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}
 
       - name: Notify staging deployment status
         if: always()
         run: |
           STATUS=${{ job.status }}
-          echo "Staging deployment $STATUS for commit ${{ github.sha }}"
+          echo "Staging deployment $STATUS for commit ${{ github.event.workflow_run.head_sha }}"
           # Swap in your real notification (Slack, email, etc.)
           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
-          #   -d "{\"text\": \"Staging deploy $STATUS: ${{ github.sha }}\"}"
+          #   -d "{\"text\": \"Staging deploy $STATUS: ${{ github.event.workflow_run.head_sha }}\"}"
 
   deploy-production:
-    if: github.ref == 'refs/heads/main'
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
     name: Deploy to Production
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment:
       name: production # GitHub will pause here for manual approval
       url: http://myapp.com
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set lowercase repository name
+        run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Copy deploy script to server
         uses: appleboy/scp-action@v0.1.7
@@ -65,7 +79,8 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
-          source: "deploy.sh"
+          # Fixed path to match staging job
+          source: "scripts/deploy.sh"
           target: "/app"
 
       - name: Run deploy script
@@ -75,13 +90,14 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
-            chmod +x /app/deploy.sh
-            /app/deploy.sh ghcr.io/${{ github.repository }}:${{ github.sha }}
+            chmod +x /app/scripts/deploy.sh
+            # Use the new env.REPO_LC variable and workflow_run.head_sha here
+            /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}
 
       - name: Notify production deployment status
         if: always()
         run: |
           STATUS=${{ job.status }}
-          echo "Production deployment $STATUS for commit ${{ github.sha }}"
+          echo "Production deployment $STATUS for commit ${{ github.event.workflow_run.head_sha }}"
           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
-          #   -d "{\"text\": \"Production deploy $STATUS: ${{ github.sha }}\"}"
+          #   -d "{\"text\": \"Production deploy $STATUS: ${{ github.event.workflow_run.head_sha }}\"}"
