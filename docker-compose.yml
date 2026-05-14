@@ -8,7 +8,7 @@ services:
       target: development
     container_name: myapp_dev
     ports:
-      - "8000:8000"
+      - "8080:8000"
     environment:
       - ENV=development
       - PORT=8000

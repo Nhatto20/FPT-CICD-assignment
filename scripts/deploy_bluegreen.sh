@@ -80,6 +80,15 @@ docker rm   "$NEW_CONTAINER" 2>/dev/null || true
 # ── Start new container on inactive slot ──────────────────────────────────────
 echo ""
 echo "▶ [3/4] Starting $NEW_SLOT container on port $NEW_PORT..."
+
+# Safety net: release the port if anything else is still holding it
+PORT_HOLDER=$(docker ps --filter "publish=${NEW_PORT}" --format "{{.Names}}" | head -n1)
+if [[ -n "$PORT_HOLDER" ]]; then
+  echo "   ⚠️  Port ${NEW_PORT} is held by container '$PORT_HOLDER' — stopping it first..."
+  docker stop "$PORT_HOLDER" 2>/dev/null || true
+  docker rm   "$PORT_HOLDER" 2>/dev/null || true
+fi
+
 docker run -d \
   --name "$NEW_CONTAINER" \
   --label "slot=$NEW_SLOT" \
