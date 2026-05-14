@@ -55,7 +55,7 @@ else
   OLD_PORT="$GREEN_PORT"
 fi
 
-HEALTH_URL="http://localhost:${NEW_PORT}/health"
+HEALTH_URL="http://host.docker.internal:${NEW_PORT}/health"
 MAX_RETRIES=15
 RETRY_INTERVAL=3
 
