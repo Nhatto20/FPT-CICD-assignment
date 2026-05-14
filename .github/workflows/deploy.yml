@@ -7,7 +7,7 @@ on:
       - completed
     branches:
       - develop # auto-deploy to staging
-      - main    # deploy to production (requires manual approval)
+      - main # deploy to production (requires manual approval)
 
 jobs:
   deploy-staging:
@@ -34,31 +34,37 @@ jobs:
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Deploy Staging Container
+      - name: Detect active slot
+        id: detect-slot
+        run: |
+          # Blue is active if myapp_blue is running; otherwise assume green is active
+          # (first deploy ever: default to green so the script deploys to blue)
+          if docker ps --filter "name=myapp_blue" --filter "status=running" --format "{{.Names}}" | grep -q "myapp_blue"; then
+            echo "active_slot=blue" >> $GITHUB_OUTPUT
+          else
+            echo "active_slot=green" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Blue-Green deployment
         run: |
           IMAGE_TAG="ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}"
+          chmod +x scripts/deploy_bluegreen.sh
+          scripts/deploy_bluegreen.sh "$IMAGE_TAG" "${{ steps.detect-slot.outputs.active_slot }}"
 
-          echo ">>> [Staging] Pulling new image: $IMAGE_TAG"
-          docker pull $IMAGE_TAG
-
-          echo ">>> [Staging] Stopping and removing old container"
-          docker stop my-app-staging || true
-          docker rm my-app-staging || true
-
-          echo ">>> [Staging] Starting new container on port 8000"
-          docker run -d \
-            --name my-app-staging \
-            --restart unless-stopped \
-            -p 8000:8000 \
-            $IMAGE_TAG
+      - name: Rollback notice
+        if: failure()
+        run: |
+          echo "🔄 Deployment failed — the previously active slot is still serving traffic."
+          echo "   Active slot was: ${{ steps.detect-slot.outputs.active_slot }}"
+          docker ps --filter "name=myapp_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
   deploy-production:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
-    name: Deploy to Production
+    name: Deploy to Production (Blue-Green)
     runs-on: self-hosted
     environment:
       name: production
-      url: http://localhost:8080
+      url: http://localhost:8000
 
     permissions:
       contents: read
@@ -76,20 +82,25 @@ jobs:
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Deploy Production Container
+      - name: Detect active slot
+        id: detect-slot
+        run: |
+          if docker ps --filter "name=myapp_blue" --filter "status=running" --format "{{.Names}}" | grep -q "myapp_blue"; then
+            echo "active_slot=blue" >> $GITHUB_OUTPUT
+          else
+            echo "active_slot=green" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Blue-Green deployment
         run: |
           IMAGE_TAG="ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}"
+          chmod +x scripts/deploy_bluegreen.sh
+          scripts/deploy_bluegreen.sh "$IMAGE_TAG" "${{ steps.detect-slot.outputs.active_slot }}"
 
-          echo ">>> [Production] Pulling new image: $IMAGE_TAG"
-          docker pull $IMAGE_TAG
-
-          echo ">>> [Production] Stopping and removing old container"
-          docker stop my-app-production || true
-          docker rm my-app-production || true
-
-          echo ">>> [Production] Starting new container on port 8080"
-          docker run -d \
-            --name my-app-production \
-            --restart unless-stopped \
-            -p 8080:8000 \
-            $IMAGE_TAG
+      # ── Rollback info on failure ───────────────────────────────────────────
+      - name: Rollback notice
+        if: failure()
+        run: |
+          echo "🔄 Deployment failed — the previously active slot is still serving traffic."
+          echo "   Active slot was: ${{ steps.detect-slot.outputs.active_slot }}"
+          docker ps --filter "name=myapp_" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
