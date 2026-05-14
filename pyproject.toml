@@ -18,7 +18,8 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-cov",
-    "httpx",       
+    "httpx",
+    "anyio[trio]",
     "ruff",
     "black",
 ]

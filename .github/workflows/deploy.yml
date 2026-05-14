@@ -2,12 +2,12 @@ name: Deploy
 
 on:
   workflow_run:
-    workflows: ["Docker Build & Scan"] # Đợi Docker build xong
+    workflows: ["Docker Build & Scan"]
     types:
       - completed
     branches:
       - develop # auto-deploy to staging
-      - main # deploy to production (requires manual approval)
+      - main    # deploy to production (requires manual approval)
 
 jobs:
   deploy-staging:
@@ -16,7 +16,7 @@ jobs:
     runs-on: self-hosted
     environment:
       name: staging
-      url: http://localhost:8000 # Truy cập trên máy bạn qua localhost:8000
+      url: http://localhost:8000
 
     permissions:
       contents: read
@@ -38,14 +38,14 @@ jobs:
         run: |
           IMAGE_TAG="ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}"
 
-          echo ">>> [Staging] Tải image mới: $IMAGE_TAG"
+          echo ">>> [Staging] Pulling new image: $IMAGE_TAG"
           docker pull $IMAGE_TAG
 
-          echo ">>> [Staging] Dừng và xóa container cũ"
+          echo ">>> [Staging] Stopping and removing old container"
           docker stop my-app-staging || true
           docker rm my-app-staging || true
 
-          echo ">>> [Staging] Khởi chạy container mới tại Port 8000"
+          echo ">>> [Staging] Starting new container on port 8000"
           docker run -d \
             --name my-app-staging \
             --restart unless-stopped \
@@ -58,7 +58,7 @@ jobs:
     runs-on: self-hosted
     environment:
       name: production
-      url: http://localhost:8080 # Truy cập production trên máy bạn qua localhost:8080
+      url: http://localhost:8080
 
     permissions:
       contents: read
@@ -80,121 +80,16 @@ jobs:
         run: |
           IMAGE_TAG="ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}"
 
-          echo ">>> [Production] Tải image mới: $IMAGE_TAG"
+          echo ">>> [Production] Pulling new image: $IMAGE_TAG"
           docker pull $IMAGE_TAG
 
-          echo ">>> [Production] Dừng và xóa container cũ"
+          echo ">>> [Production] Stopping and removing old container"
           docker stop my-app-production || true
           docker rm my-app-production || true
 
-          echo ">>> [Production] Khởi chạy container mới tại Port 8080"
-          # Ánh xạ port 8080 trên máy thật vào port 8000 của container
+          echo ">>> [Production] Starting new container on port 8080"
           docker run -d \
             --name my-app-production \
             --restart unless-stopped \
             -p 8080:8000 \
             $IMAGE_TAG
-
-# name: Deploy
-
-# on:
-#   workflow_run:
-#     workflows: ["Docker Build & Scan"] # Đợi Docker build xong
-#     types:
-#       - completed
-#     branches:
-#       - develop # auto-deploy to staging
-#       - main # deploy to production (requires manual approval)
-
-# jobs:
-#   deploy-staging:
-#     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'develop'
-#     name: Deploy to Staging
-#     runs-on: self-hosted
-#     environment:
-#       name: staging
-#       url: http://staging.myapp.com # shown in GitHub deployment UI
-
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v5
-#         with:
-#           ref: ${{ github.event.workflow_run.head_sha }}
-
-#       - name: Set lowercase repository name
-#         run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
-
-#       - name: Copy deploy script to server
-#         uses: appleboy/scp-action@v0.1.7
-#         with:
-#           host: ${{ secrets.STAGING_HOST }}
-#           username: ${{ secrets.STAGING_USER }}
-#           key: ${{ secrets.STAGING_SSH_KEY }}
-#           source: "scripts/deploy.sh"
-#           target: "/app"
-
-#       - name: Run deploy script
-#         uses: appleboy/ssh-action@v1
-#         with:
-#           host: ${{ secrets.STAGING_HOST }}
-#           username: ${{ secrets.STAGING_USER }}
-#           key: ${{ secrets.STAGING_SSH_KEY }}
-#           script: |
-#             chmod +x /app/scripts/deploy.sh
-#             # Use the new env.REPO_LC variable and workflow_run.head_sha here
-#             /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}
-
-#       - name: Notify staging deployment status
-#         if: always()
-#         run: |
-#           STATUS=${{ job.status }}
-#           echo "Staging deployment $STATUS for commit ${{ github.event.workflow_run.head_sha }}"
-#           # Swap in your real notification (Slack, email, etc.)
-#           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
-#           #   -d "{\"text\": \"Staging deploy $STATUS: ${{ github.event.workflow_run.head_sha }}\"}"
-
-#   deploy-production:
-#     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
-#     name: Deploy to Production
-#     runs-on: self-hosted
-#     environment:
-#       name: production # GitHub will pause here for manual approval
-#       url: http://myapp.com
-
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v5
-#         with:
-#           ref: ${{ github.event.workflow_run.head_sha }}
-
-#       - name: Set lowercase repository name
-#         run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
-
-#       - name: Copy deploy script to server
-#         uses: appleboy/scp-action@v0.1.7
-#         with:
-#           host: ${{ secrets.PROD_HOST }}
-#           username: ${{ secrets.PROD_USER }}
-#           key: ${{ secrets.PROD_SSH_KEY }}
-#           # Fixed path to match staging job
-#           source: "scripts/deploy.sh"
-#           target: "/app"
-
-#       - name: Run deploy script
-#         uses: appleboy/ssh-action@v1
-#         with:
-#           host: ${{ secrets.PROD_HOST }}
-#           username: ${{ secrets.PROD_USER }}
-#           key: ${{ secrets.PROD_SSH_KEY }}
-#           script: |
-#             chmod +x /app/scripts/deploy.sh
-#             # Use the new env.REPO_LC variable and workflow_run.head_sha here
-#             /app/scripts/deploy.sh ghcr.io/${{ env.REPO_LC }}:${{ github.event.workflow_run.head_sha }}
-
-#       - name: Notify production deployment status
-#         if: always()
-#         run: |
-#           STATUS=${{ job.status }}
-#           echo "Production deployment $STATUS for commit ${{ github.event.workflow_run.head_sha }}"
-#           # curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
-#           #   -d "{\"text\": \"Production deploy $STATUS: ${{ github.event.workflow_run.head_sha }}\"}"
