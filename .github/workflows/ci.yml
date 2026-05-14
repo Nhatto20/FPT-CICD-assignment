@@ -72,7 +72,7 @@ jobs:
   sonarqube:
     name: SonarQube Analysis & Quality Gate
     needs: test
-    runs-on: self-hosted  # Must run on self-hosted — GitHub-hosted runners cannot reach local SonarQube
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
@@ -86,7 +86,7 @@ jobs:
           name: coverage-report
 
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v6  # v5 deprecated + has security vulnerability
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
