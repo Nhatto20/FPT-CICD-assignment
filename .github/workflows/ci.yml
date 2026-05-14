@@ -72,13 +72,13 @@ jobs:
   sonarqube:
     name: SonarQube Analysis & Quality Gate
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # Must run on self-hosted — GitHub-hosted runners cannot reach local SonarQube
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0  # Full history needed for SonarQube blame analysis
+          fetch-depth: 0
 
       - name: Download coverage report
         uses: actions/download-artifact@v5
@@ -86,7 +86,7 @@ jobs:
           name: coverage-report
 
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6  # v5 deprecated + has security vulnerability
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
