@@ -202,7 +202,7 @@ sonarqube:
 ### Phase 3 — Blue-Green Deployment
 **Goal**: Replace naive `docker run` deployment with Blue-Green strategy.
 
-1. **Rewrite `scripts/deploy.sh`**:
+1. **Rewrite `scripts/deploy_bluegreen.sh`**:
    - Accept `IMAGE_TAG` and `SLOT` (blue/green) as arguments
    - Start new container on designated slot
    - Poll `/health` with retry logic
@@ -210,14 +210,14 @@ sonarqube:
    - On failure: stop new slot, exit with error (triggers rollback)
 2. **Update `deploy.yml`**:
    - Determine active/inactive slot before deploy
-   - Pass correct slot to `deploy.sh`
+   - Pass correct slot to `deploy_bluegreen.sh`
    - Add rollback step triggered on failure
 3. **Port mapping for Blue-Green** (local setup):
    - Blue: port `8000`
    - Green: port `8001`
    - A simple Nginx or port-switch approach to route traffic
 
-**Files touched**: `scripts/deploy.sh`, `deploy.yml`
+**Files touched**: `scripts/deploy_bluegreen.sh`, `deploy.yml`
 **Risk**: Medium-High — requires careful port management
 
 ---
